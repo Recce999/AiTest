@@ -52,7 +52,7 @@ aitest/
 │   │   ├── models/              # 六张表
 │   │   ├── schemas/             # 请求/响应校验
 │   │   └── services/            # 业务层（认证、执行引擎、AI 生成、权限）
-│   ├── tests/                   # pytest 用例（25 个）
+│   ├── tests/                   # pytest 用例（26 个）
 │   ├── requirements.txt
 │   ├── requirements-dev.txt
 │   └── .env.example
@@ -60,6 +60,7 @@ aitest/
 ├── assets/screenshots/          # README 界面截图
 ├── .github/workflows/ci.yml     # 后端测试 + 前端构建
 ├── Dockerfile                   # 多阶段构建：Node 构建前端 → Python 运行后端
+├── BUGFIX.md                    # 缺陷记录：现象、根因、修复、验证
 └── docs/                        # 设计说明书、手册、练习单（本地资料，未入库）
 ```
 
@@ -97,9 +98,10 @@ pip install -r requirements-dev.txt
 python -m pytest
 ```
 
-- 25 个用例覆盖：健康检查、认证与越权、项目/接口/用例 CRUD、AI 生成建议不落库、执行引擎（假响应替换真实 HTTP）、SSRF 拦截、批量执行、执行历史与报告详情。
+- 26 个用例覆盖：健康检查、认证与越权、项目/接口/用例 CRUD、AI 生成建议不落库、执行引擎（假响应替换真实 HTTP）、SSRF 拦截、批量执行、执行历史与报告详情、删除项目时清理执行记录。
 - 测试使用临时 SQLite，每个用例执行前重建表，互不污染。
 - GitHub Actions 同时执行后端 pytest 与前端 `npm run build`。
+- 开发与自测中发现并修复的缺陷记录在 [BUGFIX.md](BUGFIX.md)。
 
 ## 部署
 
