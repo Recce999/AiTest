@@ -22,7 +22,7 @@
 
 ## 在线演示
 
-部署地址：待补充（Render 免费实例，15 分钟无访问会休眠，首次打开约需 30 秒唤醒）。
+尚未部署。镜像已就绪（见下方「部署」），本地按「本地启动」或 Docker 一条命令即可运行完整功能。
 
 ## 技术栈
 
@@ -32,7 +32,7 @@
 | 数据库 | SQLite（开发）→ PostgreSQL（部署） | 零配置起步，上线只改连接串 |
 | 认证 | JWT + bcrypt | 无状态、部署简单 |
 | 前端 | Vue3 + Vite + Element Plus + Pinia | 当前主流组合，组件齐全 |
-| 部署 | Docker 单镜像 + Render | 前后端同源，一条命令起服务 |
+| 部署 | Docker 多阶段镜像 | 前端打包后由后端托管，前后端同源，可跑在任意容器平台 |
 
 ## 功能
 
@@ -107,30 +107,26 @@ python -m pytest
 
 ## 部署
 
-### Render（推荐，免费）
-
-仓库已包含 `render.yaml`，用 Docker 构建单一镜像（前端打包后由后端托管）：
-
-1. 推送代码到 GitHub；
-2. 打开 <https://render.com/deploy?repo=https://github.com/Recce999/AiTest>，授权 GitHub 后读取蓝图；
-3. Render 自动创建免费 Web 服务，并注入 `JWT_SECRET`；
-4. 部署完成后访问 `https://<服务名>.onrender.com/health` 验证。
-
-免费实例的注意点：
-
-- 15 分钟无访问会休眠，首次访问需等待唤醒（约 30 秒）；
-- 默认使用容器内 SQLite，**重新部署会清空数据**；需要持久化就在 Render 控制台另建一个免费 PostgreSQL，把 Internal Database URL 填进本服务的 `DATABASE_URL`；
-- 蓝图里不要同时声明 `databases`，否则 Apply 时会要求绑定信用卡（免费 Web 服务本身不需要）；
-- 生产环境已设置 `ALLOW_PRIVATE_TARGET=false`，执行引擎会拦截内网目标。
-
-### Docker
+### Docker（已验证可用，推荐）
 
 ```bash
 docker build -t aitest .
 docker run -p 8000:8000 -e JWT_SECRET="$(python -c 'import secrets;print(secrets.token_hex(32))')" aitest
 ```
 
-访问 <http://127.0.0.1:8000>，前端、接口、文档由同一个容器提供。
+访问 <http://127.0.0.1:8000>，前端、接口、文档由同一个容器提供。想放到公网，把镜像推到任意容器平台即可（Koyeb / Fly.io / Railway / 云服务器 + Docker Compose）。
+
+### Render（蓝图已备好，但账号需绑定信用卡）
+
+仓库里有 `render.yaml`，可一键创建免费 Web 服务：
+
+1. 打开 <https://render.com/deploy?repo=https://github.com/Recce999/AiTest>，授权 GitHub 后读取蓝图；
+2. Render 自动创建 Web 服务并注入 `JWT_SECRET`；
+3. 部署完成后访问 `https://<服务名>.onrender.com/health` 验证。
+
+注意：Render 现在对新建服务要求绑定银行卡（$1 临时预授权，免费套餐不扣费），即使蓝图里没有任何数据库。没有国际卡时请用上面的 Docker 方式自行部署。
+
+免费实例的其他限制：15 分钟无访问会休眠，首次访问需等待约 30 秒；默认使用容器内 SQLite，**重新部署会清空数据**，需要持久化就把 Neon / Supabase 等免费 PostgreSQL 的连接串填进 `DATABASE_URL`。生产环境务必设置 `ALLOW_PRIVATE_TARGET=false`。
 
 ## 配置
 
