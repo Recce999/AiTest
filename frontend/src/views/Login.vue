@@ -12,28 +12,28 @@
         </div>
 
         <h1 class="brand-title">让接口测试<br />像写文档一样简单</h1>
-        <p class="brand-desc">录入接口 → AI 生成用例 → 一键执行 → 可视化报告</p>
+        <p class="brand-desc">录入接口 → 生成用例 → 一键执行 → 可视化报告</p>
 
         <ul class="feature-list">
           <li>
             <span class="feature-icon"><el-icon><Key /></el-icon></span>
             <div>
-              <div class="feature-title">JWT 鉴权</div>
-              <div class="feature-text">登录态全链路校验，接口数据按用户隔离</div>
+              <div class="feature-title">身份令牌校验（JWT）</div>
+              <div class="feature-text">登录状态全程校验，接口数据按用户隔离</div>
             </div>
           </li>
           <li>
             <span class="feature-icon"><el-icon><CircleCheck /></el-icon></span>
             <div>
               <div class="feature-title">三类断言</div>
-              <div class="feature-text">状态码、JSON 字段与响应耗时，一次覆盖</div>
+              <div class="feature-text">状态码、返回内容字段与响应耗时，一次覆盖</div>
             </div>
           </li>
           <li>
             <span class="feature-icon"><el-icon><Lock /></el-icon></span>
             <div>
-              <div class="feature-title">SSRF 防护</div>
-              <div class="feature-text">执行前校验目标地址，阻断内网探测风险</div>
+              <div class="feature-title">内网地址防护（SSRF）</div>
+              <div class="feature-text">发请求前先判断目标地址，阻断内网探测风险</div>
             </div>
           </li>
         </ul>

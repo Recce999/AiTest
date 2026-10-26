@@ -100,7 +100,7 @@ def test_run_failed_on_status_code(client, make_user, monkeypatch):
 
     assert (run["total"], run["passed"], run["failed"]) == (1, 0, 1)
     assert run["results"][0]["status"] == "failed"
-    assert "状态码期望 200" in run["results"][0]["error_msg"]
+    assert "状态码必须等于 200" in run["results"][0]["error_msg"]
 
 
 def test_run_failed_on_missing_json_field(client, make_user, monkeypatch):
@@ -117,7 +117,7 @@ def test_run_failed_on_missing_json_field(client, make_user, monkeypatch):
     run = client.post("/api/runs", json={"project_id": project_id}, headers=headers).json()["data"]
 
     assert run["failed"] == 1
-    assert "字段 data.nope 不存在" in run["results"][0]["error_msg"]
+    assert "返回内容里找不到字段 data.nope" in run["results"][0]["error_msg"]
 
 
 def test_run_without_cases_is_rejected(client, make_user):

@@ -46,28 +46,28 @@ def _judge(assertions: list, status_code: int, body, duration_ms: int, expected_
     failures: list[str] = []
 
     if expected_status and status_code != expected_status:
-        failures.append(f"状态码期望 {expected_status}，实际 {status_code}")
+        failures.append(f"状态码必须等于 {expected_status}，实际返回 {status_code}")
 
     for item in assertions or []:
         kind = item.get("type")
         expected = item.get("expected")
         if kind == "status_code":
             if status_code != expected:
-                failures.append(f"状态码期望 {expected}，实际 {status_code}")
+                failures.append(f"状态码必须等于 {expected}，实际返回 {status_code}")
         elif kind == "json_field":
             path = item.get("path", "")
             try:
                 actual = _pick(body, path)
             except (KeyError, IndexError, ValueError, TypeError):
-                failures.append(f"字段 {path} 不存在")
+                failures.append(f"返回内容里找不到字段 {path}")
                 continue
             if actual != expected:
-                failures.append(f"字段 {path} 期望 {expected}，实际 {actual}")
+                failures.append(f"返回内容里 {path} 必须等于 {expected}，实际是 {actual}")
         elif kind == "max_duration":
             if duration_ms > int(expected):
-                failures.append(f"响应耗时 {duration_ms}ms 超过 {expected}ms")
+                failures.append(f"响应耗时 {duration_ms} 毫秒，超过了允许的 {expected} 毫秒")
         else:
-            failures.append(f"未知断言类型：{kind}")
+            failures.append(f"不认识的断言类型：{kind}")
     return failures
 
 

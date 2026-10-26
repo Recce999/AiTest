@@ -25,6 +25,7 @@
           clearable
           :prefix-icon="Search"
         />
+        <span class="filter-label">请求方法</span>
         <div class="method-seg">
           <button
             v-for="m in ['ALL', ...methods]"
@@ -32,6 +33,7 @@
             type="button"
             class="seg-btn"
             :class="{ active: methodFilter === m }"
+            :title="m === 'ALL' ? '全部请求方法' : methodLabel(m)"
             @click="methodFilter = m"
           >
             {{ m === 'ALL' ? '全部' : m }}
@@ -41,9 +43,14 @@
       </div>
 
       <el-table :data="filtered" v-loading="loading" class="api-table">
-        <el-table-column label="方法" width="96">
+        <el-table-column label="请求方法" width="100">
           <template #default="{ row }">
-            <el-tag class="method-tag" :class="methodClass(row.method)" disable-transitions>
+            <el-tag
+              class="method-tag"
+              :class="methodClass(row.method)"
+              :title="methodLabel(row.method)"
+              disable-transitions
+            >
               {{ row.method }}
             </el-tag>
           </template>
@@ -87,7 +94,7 @@
         </el-form-item>
         <el-form-item label="请求方法">
           <el-select v-model="form.method" style="width: 100%">
-            <el-option v-for="m in methods" :key="m" :label="m" :value="m" />
+            <el-option v-for="m in methods" :key="m" :label="methodLabel(m)" :value="m" />
           </el-select>
         </el-form-item>
         <el-form-item label="路径">
@@ -122,6 +129,19 @@ const route = useRoute()
 const pid = route.params.pid
 const methods = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH']
 
+// HTTP 方法名是通用专有名词，界面上中文在前、英文原名放在括号里
+const methodNames = {
+  GET: '查询',
+  POST: '新增',
+  PUT: '更新',
+  DELETE: '删除',
+  PATCH: '局部更新'
+}
+
+function methodLabel(method) {
+  return methodNames[method] ? `${methodNames[method]}（${method}）` : method
+}
+
 const list = ref([])
 const loading = ref(false)
 const dialog = ref(false)
@@ -154,7 +174,7 @@ function parseJson(text, fallback) {
   try {
     return JSON.parse(text)
   } catch {
-    ElMessage.error('JSON 格式不正确')
+    ElMessage.error('数据格式不正确（JSON）')
     throw new Error('invalid json')
   }
 }
@@ -248,6 +268,12 @@ onMounted(() => {
 
 .filter-search {
   max-width: 300px;
+}
+
+.filter-label {
+  font-size: 12px;
+  color: #94a3b8;
+  white-space: nowrap;
 }
 
 /* 方法筛选：分段控件，比下拉更直观 */

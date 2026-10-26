@@ -82,7 +82,7 @@
         </el-table-column>
         <el-table-column label="耗时" width="104">
           <template #default="{ row }">
-            <span class="mono">{{ row.duration_ms }} ms</span>
+            <span class="mono">{{ row.duration_ms }} 毫秒</span>
           </template>
         </el-table-column>
         <el-table-column label="执行时间" min-width="170">

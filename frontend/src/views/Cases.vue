@@ -39,11 +39,11 @@
         <el-table-column label="来源" width="92">
           <template #default="{ row }">
             <el-tag class="source-tag" :class="row.source === 'ai' ? 'source-ai' : 'source-manual'" disable-transitions>
-              {{ row.source === 'ai' ? 'AI' : '手工' }}
+              {{ row.source === 'ai' ? 'AI 生成' : '手工编写' }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="断言" min-width="300">
+        <el-table-column label="断言规则" min-width="320">
           <template #default="{ row }">
             <div v-if="assertionChips(row.assertions).length" class="chips">
               <span
@@ -55,7 +55,7 @@
                 {{ chip.text }}
               </span>
             </div>
-            <span v-else class="muted">无断言</span>
+            <span v-else class="muted">没有设置断言规则</span>
           </template>
         </el-table-column>
         <el-table-column label="启用" width="96">
@@ -76,14 +76,14 @@
           <div class="empty-hint">
             <el-icon><Document /></el-icon>
             <div class="empty-title">还没有测试用例</div>
-            <div>可以手动新增，或让 AI 根据接口定义生成候选用例</div>
+            <div>可以手动新增，或让 AI（人工智能）根据接口定义生成候选用例</div>
           </div>
         </template>
       </el-table>
     </div>
 
     <!-- 手工新增 -->
-    <el-dialog v-model="dialog" title="新增用例" width="560px">
+    <el-dialog v-model="dialog" title="新增用例" width="640px">
       <el-form :model="form" label-position="top">
         <el-form-item label="用例名">
           <el-input v-model="form.name" placeholder="例如：健康检查 - 正常返回" />
@@ -91,11 +91,21 @@
         <el-form-item label="请求参数">
           <el-input v-model="form.payloadText" type="textarea" :rows="2" placeholder='{"username":"test"}' />
         </el-form-item>
-        <el-form-item label="断言">
-          <el-input v-model="form.assertionsText" type="textarea" :rows="5"
+        <el-form-item label="断言规则">
+          <el-input v-model="form.assertionsText" type="textarea" :rows="4"
             placeholder='[{"type":"status_code","expected":200}]' />
         </el-form-item>
       </el-form>
+
+      <div class="assert-help">
+        <div class="assert-help-title">断言规则支持三种写法，保存后界面上会自动翻译成中文句子</div>
+        <ul>
+          <li><b>检查状态码</b>：类型写 <code>status_code</code>，期望值填数字。意思是「状态码必须等于多少」。</li>
+          <li><b>检查返回内容里的字段</b>：类型写 <code>json_field</code>，再填字段路径和期望值。路径用小数点一层层往下写，遇到列表就写序号，例如 <code>data.user.id</code>、<code>items.0.name</code>。意思是「返回内容里某个字段必须等于多少」。</li>
+          <li><b>检查响应速度</b>：类型写 <code>max_duration</code>，期望值填毫秒数。意思是「响应耗时不得超过多少毫秒」。</li>
+        </ul>
+        <div class="assert-help-note">多条规则写在一起时，每条单独用一对方括号括起来，中间用逗号隔开。格式不对会提示「数据格式不正确（JSON）」，不会保存。</div>
+      </div>
       <template #footer>
         <el-button @click="dialog = false">取消</el-button>
         <el-button type="primary" @click="onCreate">确定</el-button>
@@ -113,7 +123,7 @@
             <span class="ai-name">{{ item.name }}</span>
             <el-button type="primary" size="small" @click="adopt(item)">采纳</el-button>
           </div>
-          <div class="ai-payload mono">{{ payloadSummary(item.payload) }}</div>
+          <div class="ai-payload">{{ payloadSummary(item.payload) }}</div>
           <div v-if="assertionChips(item.assertions).length" class="chips">
             <span
               v-for="(chip, i) in assertionChips(item.assertions)"
@@ -167,26 +177,42 @@ function onSelectionChange(rows) {
   selected.value = rows
 }
 
+// 断言一律输出成中文自然语言，读报告的人不需要懂 JSON 也能看懂
 function assertionChips(assertions) {
   if (!Array.isArray(assertions) || !assertions.length) return []
   return assertions.map((item) => {
     const type = item?.type
     if (type === 'status_code') {
-      return { text: `状态码 = ${item.expected}`, cls: 'chip-status' }
+      return { text: `状态码必须等于 ${item.expected}`, cls: 'chip-status' }
     }
     if (type === 'json_field') {
-      return { text: `字段 ${item.path || '?'} = ${item.expected}`, cls: 'chip-field' }
+      return {
+        text: `返回内容里 ${item.path || '?'} 必须等于 ${describeValue(item.expected)}`,
+        cls: 'chip-field'
+      }
     }
     if (type === 'max_duration') {
-      return { text: `耗时 ≤ ${item.expected}ms`, cls: 'chip-time' }
+      return { text: `响应耗时不得超过 ${item.expected} 毫秒`, cls: 'chip-time' }
     }
-    return { text: `${type || '断言'} ${item?.expected ?? ''}`.trim(), cls: '' }
+    return { text: `不认识的断言类型：${type || '未填写'}`, cls: '' }
   })
 }
 
+// 期望值直接贴出来会分不清字符串和数字，加一层说明
+function describeValue(value) {
+  if (typeof value === 'string') return `文字「${value}」`
+  if (value === null) return '空值'
+  if (typeof value === 'boolean') return value ? '真' : '假'
+  return String(value)
+}
+
+// 请求参数也用中文说法展示，而不是丢一段 JSON 给用户看
 function payloadSummary(payload) {
-  if (!payload || (typeof payload === 'object' && !Object.keys(payload).length)) return '无请求参数'
-  const text = typeof payload === 'string' ? payload : JSON.stringify(payload)
+  if (!payload) return '无请求参数'
+  if (typeof payload === 'string') return payload.length > 120 ? `${payload.slice(0, 120)}…` : payload
+  const keys = Object.keys(payload)
+  if (!keys.length) return '无请求参数'
+  const text = keys.map((key) => `${key} 为 ${describeValue(payload[key])}`).join('，')
   return text.length > 120 ? `${text.slice(0, 120)}…` : text
 }
 
@@ -211,7 +237,7 @@ async function onCreate() {
     payload = form.payloadText ? JSON.parse(form.payloadText) : {}
     assertions = JSON.parse(form.assertionsText || '[]')
   } catch {
-    return ElMessage.error('JSON 格式不正确')
+    return ElMessage.error('数据格式不正确（JSON）')
   }
   await request.post('/cases', { api_id: aid, name: form.name, payload, assertions, enabled: true })
   ElMessage.success('创建成功')
@@ -403,5 +429,54 @@ onMounted(load)
   color: #64748b;
   font-size: 11.5px;
   word-break: break-all;
+}
+
+/* 断言填写说明：把三种规则用中文讲清楚 */
+.assert-help {
+  margin: 2px 0 4px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: #f8fafc;
+  border: 1px solid #eef1f7;
+}
+
+.assert-help-title {
+  margin-bottom: 7px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #334155;
+}
+
+.assert-help ul {
+  margin: 0;
+  padding-left: 17px;
+}
+
+.assert-help li {
+  margin-bottom: 5px;
+  font-size: 12px;
+  line-height: 1.62;
+  color: #64748b;
+}
+
+.assert-help li b {
+  color: #475569;
+}
+
+.assert-help code {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: #eef2ff;
+  color: #4338ca;
+  font-family: var(--app-mono);
+  font-size: 11.5px;
+}
+
+.assert-help-note {
+  margin-top: 7px;
+  padding-top: 7px;
+  border-top: 1px dashed #e2e8f0;
+  font-size: 11.5px;
+  color: #94a3b8;
 }
 </style>
