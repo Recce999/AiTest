@@ -8,6 +8,7 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from loguru import logger
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -56,15 +57,37 @@ FRONTEND_DIST = Path(__file__).resolve().parents[2] / "frontend" / "dist"
 
 
 class SPAStaticFiles(StaticFiles):
-    """找不到静态文件时回退到 index.html，交给 vue-router 处理前端路由。"""
+    """找不到静态文件时回退到 index.html，交给 vue-router 处理前端路由。
+
+    只有「像前端路由」的路径才回退。接口路径与静态资源必须如实返回 404，
+    否则兜底会把所有不存在的地址都变成 200 + HTML，调用方和测试工具都拿不到真实状态码。
+    """
 
     async def get_response(self, path: str, scope):
+        # Windows 下 StaticFiles 会把分隔符规范化成反斜杠，这里统一回斜杠再判断
+        normalized = path.replace("\\", "/").lstrip("/")
         try:
-            return await super().get_response(path, scope)
+            return await super().get_response(normalized, scope)
         except StarletteHTTPException as exc:
-            if exc.status_code == 404:
+            if exc.status_code != 404:
+                raise
+            if self._is_frontend_route(normalized):
                 return await super().get_response("index.html", scope)
-            raise
+            return JSONResponse(
+                status_code=404,
+                content={"code": 404, "msg": f"接口不存在：/{normalized}", "data": None},
+            )
+
+    @staticmethod
+    def _is_frontend_route(path: str) -> bool:
+        path = path.replace("\\", "/").lstrip("/")
+        if path in ("", "index.html"):
+            return True
+        # 接口路径交给后端返回真实的 404，不能回退成页面
+        if path == "health" or path.startswith("api/"):
+            return False
+        # 带扩展名的请求是静态资源（js/css/png…），找不到就是真的找不到
+        return "." not in path.rsplit("/", 1)[-1]
 
 
 # 本地开发只跑后端时 dist 不存在，跳过挂载；Docker 构建后自动生效

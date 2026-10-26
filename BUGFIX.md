@@ -120,3 +120,129 @@ def delete_project(project_id: int, db: Session = Depends(get_db),
 > 修复是在删除项目前显式清理执行记录和明细，先删明细再删记录。同时补了一个回归测试，断言删完项目之后执行记录和明细都查不到。
 >
 > 这件事让我意识到两件事：一是删除操作的自测要覆盖所有关联表，不能只看主表；二是开发期用的数据库如果比生产宽松（SQLite 不校验外键），本地测得过不代表生产没问题。
+
+---
+
+## BUG-002 不存在的接口路径返回 200，负向用例全部失效
+
+| 项目 | 内容 |
+|---|---|
+| 发现时间 | 2026-10-26 |
+| 发现方式 | 用平台自测时，多条负向用例（期望 404 / 422）结果完全一致 |
+| 严重级别 | 高（被测目标恒返回 200，负向测试完全失效） |
+| 影响版本 | 修复前所有版本 |
+| 修复提交 | 见仓库提交记录（`app/main.py` 的 `SPAStaticFiles`） |
+
+### 现象
+
+用平台测试自己（或任何托管了前端页面的服务）时，「不存在的路径应返回 404」「缺少必填参数应返回 422」这类负向用例全部失败，失败原因一模一样：
+
+```text
+状态码必须等于 404，实际返回 200
+状态码必须等于 422，实际返回 200
+```
+
+多条不同意图的用例给出同一个结果，说明问题不在用例，而在被测目标——它根本没有返回真实状态码。
+
+### 复现步骤
+
+1. 项目基础地址填 `http://127.0.0.1:8000`（平台自己）
+2. 建一个路径为任意不存在地址的接口，例如 `/not-exist-path`
+3. 断言「状态码必须等于 404」
+4. 执行：实际返回 200，响应体是一整页 HTML
+
+### 根因
+
+后端为了让前端路由（`/projects/1/apis` 这类）刷新可用，把整个前端目录挂在了根路径上，并做了兜底：
+
+```python
+# 修复前
+class SPAStaticFiles(StaticFiles):
+    async def get_response(self, path, scope):
+        try:
+            return await super().get_response(path, scope)
+        except StarletteHTTPException as exc:
+            if exc.status_code == 404:
+                return await super().get_response("index.html", scope)  # 一律回退页面
+            raise
+```
+
+兜底是无条件的：**任何** 404 都变成 `index.html` + HTTP 200。于是：
+
+- `/api/not-exist`（拼错的接口地址）→ 200 + 前端页面
+- `/api/projects/999999`（不存在的资源）→ 200 + 前端页面
+- `/assets/missing.js`（找不到的静态资源）→ 200 + 前端页面
+
+对一个「接口自动化测试平台」来说这是致命的：它自己的接口地址只要写错，永远不会报错，负向用例永远拿不到真实状态码。
+
+### 修复
+
+只有「像前端路由」的路径才回退，接口路径和静态资源必须如实返回 404：
+
+```python
+# app/main.py
+async def get_response(self, path, scope):
+    # Windows 下 StaticFiles 会把分隔符规范化成反斜杠，这里统一回斜杠再判断
+    normalized = path.replace("\\", "/").lstrip("/")
+    try:
+        return await super().get_response(normalized, scope)
+    except StarletteHTTPException as exc:
+        if exc.status_code != 404:
+            raise
+        if self._is_frontend_route(normalized):
+            return await super().get_response("index.html", scope)
+        return JSONResponse(
+            status_code=404,
+            content={"code": 404, "msg": f"接口不存在：/{normalized}", "data": None},
+        )
+
+@staticmethod
+def _is_frontend_route(path: str) -> bool:
+    path = path.replace("\\", "/").lstrip("/")
+    if path in ("", "index.html"):
+        return True
+    if path == "health" or path.startswith("api/"):
+        return False          # 接口路径：返回真实 404
+    return "." not in path.rsplit("/", 1)[-1]   # 带扩展名的是静态资源：返回真实 404
+```
+
+修复后实测：
+
+| 请求 | 修复前 | 修复后 |
+|---|---|---|
+| `GET /api/not-exist-path` | 200 + HTML | **404 + JSON** |
+| `GET /api/projects/999999` | 200 + HTML | **404 + JSON** |
+| `GET /assets/missing.js` | 200 + HTML | **404 + JSON** |
+| `GET /projects/1/apis`（前端路由） | 200 + HTML | 200 + HTML（不变） |
+| `GET /not-exist-path`（普通页面路径） | 200 + HTML | 200 + HTML（不变） |
+
+### 调试中踩的坑
+
+第一版修复写完测试仍然全红，返回的依旧是一页 HTML欢迎页。加日志打印实际入参才看到：
+
+```text
+PATH= 'api\\definitely-not-exist'
+```
+
+在 Windows 上 `StaticFiles` 会把路径规范化成反斜杠，用 `startswith("api/")` 永远匹配不到。**同一段代码在 Linux 上会正常、在 Windows 上失效**——这类平台差异必须靠实际运行验证，不能只看代码判断。
+
+### 验证
+
+1. 新增 4 个测试：未知接口返回 404、前端路由仍能回退页面、缺失静态资源返回 404（无前端产物时自动跳过）。pytest 全部 30 个用例通过。
+2. 重启服务后逐个请求实测，结果如上表。
+
+### 经验
+
+- **「结果都一样」是排查信号。** 多条不同意图的用例得出同一个结论，先怀疑被测目标或测试工具，而不是逐条改用例。
+- **兜底逻辑容易吃掉错误。** 任何 catch 之后一律返回成功/默认页面，都会让错误静默。兜底必须收窄到「确实该兜底」的范围。
+- **同一份代码在不同系统上行为可能不同。** 路径分隔符、文件系统大小写、编码，都是典型差异点。
+- **平台自己必须能被自己测。** 一个测试平台如果测不了自己，说明它的接口行为不够规范。
+
+### 面试可用的讲法
+
+> 我用平台自测时发现，几条期望 404 和 422 的负向用例全部失败，而且失败原因完全一样——都是实际返回 200。原因是我们把前端单页应用挂在根路径做了兜底，任何 404 都会被替换成 `index.html`，所以不存在的接口地址永远返回 200，负向测试全部失效。
+>
+> 修复是把兜底范围收窄：只有不像接口、也不像静态资源的路径才回退页面，`/api/*` 和带扩展名的请求如实返回 404，并且返回统一的 JSON 结构。中间还踩了一个坑——第一版在 Windows 上不生效，因为 StaticFiles 会把路径分隔符规范化成反斜杠，用斜杠做前缀判断永远匹配不上。
+>
+> 这件事说明兜底逻辑要有边界，否则错误会被静默吞掉；另外测试平台自己必须能被自己测，这是验证接口行为是否规范最直接的方式。
+
