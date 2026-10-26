@@ -52,7 +52,7 @@ aitest/
 │   │   ├── models/              # 六张表
 │   │   ├── schemas/             # 请求/响应校验
 │   │   └── services/            # 业务层（认证、执行引擎、AI 生成、权限）
-│   ├── tests/                   # pytest 用例（26 个）
+│   ├── tests/                   # pytest 用例（30 个）
 │   ├── requirements.txt
 │   ├── requirements-dev.txt
 │   └── .env.example
