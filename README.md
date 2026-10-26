@@ -20,10 +20,6 @@
 
 界面风格：深色侧边栏 + 靛蓝紫主色（`#6366F1`）；统一卡片、状态色与空状态，通过率环形进度、方法分段筛选、断言 chip、响应体抽屉等细节均按「单页单主操作」原则组织。
 
-## 在线演示
-
-尚未部署。镜像已就绪（见下方「部署」），本地按「本地启动」或 Docker 一条命令即可运行完整功能。
-
 ## 技术栈
 
 | 层 | 选型 | 理由 |
@@ -56,7 +52,7 @@ aitest/
 │   │   ├── models/              # 六张表
 │   │   ├── schemas/             # 请求/响应校验
 │   │   └── services/            # 业务层（认证、执行引擎、AI 生成、权限）
-│   ├── tests/                   # pytest 用例（23 个）
+│   ├── tests/                   # pytest 用例（25 个）
 │   ├── requirements.txt
 │   ├── requirements-dev.txt
 │   └── .env.example
@@ -64,7 +60,6 @@ aitest/
 ├── assets/screenshots/          # README 界面截图
 ├── .github/workflows/ci.yml     # 后端测试 + 前端构建
 ├── Dockerfile                   # 多阶段构建：Node 构建前端 → Python 运行后端
-├── render.yaml                  # Render 一键部署配置
 └── docs/                        # 设计说明书、手册、练习单（本地资料，未入库）
 ```
 
@@ -102,32 +97,25 @@ pip install -r requirements-dev.txt
 python -m pytest
 ```
 
-- 23 个用例覆盖：健康检查、认证与越权、项目/接口/用例 CRUD、AI 生成建议不落库、执行引擎（假响应替换真实 HTTP）、SSRF 拦截、执行历史与报告详情。
+- 25 个用例覆盖：健康检查、认证与越权、项目/接口/用例 CRUD、AI 生成建议不落库、执行引擎（假响应替换真实 HTTP）、SSRF 拦截、批量执行、执行历史与报告详情。
 - 测试使用临时 SQLite，每个用例执行前重建表，互不污染。
 - GitHub Actions 同时执行后端 pytest 与前端 `npm run build`。
 
 ## 部署
 
-### Docker（已验证可用，推荐）
+### Docker
 
 ```bash
 docker build -t aitest .
 docker run -p 8000:8000 -e JWT_SECRET="$(python -c 'import secrets;print(secrets.token_hex(32))')" aitest
 ```
 
-访问 <http://127.0.0.1:8000>，前端、接口、文档由同一个容器提供。想放到公网，把镜像推到任意容器平台即可（Koyeb / Fly.io / Railway / 云服务器 + Docker Compose）。
+访问 <http://127.0.0.1:8000>，前端、接口、文档由同一个容器提供。镜像可直接部署到任意容器平台（Railway / Fly.io / Koyeb）或云服务器 + Docker Compose。
 
-### Render（蓝图已备好，但账号需绑定信用卡）
+生产环境有两点必须确认：
 
-仓库里有 `render.yaml`，可一键创建免费 Web 服务：
-
-1. 打开 <https://render.com/deploy?repo=https://github.com/Recce999/AiTest>，授权 GitHub 后读取蓝图；
-2. Render 自动创建 Web 服务并注入 `JWT_SECRET`；
-3. 部署完成后访问 `https://<服务名>.onrender.com/health` 验证。
-
-注意：Render 现在对新建服务要求绑定银行卡（$1 临时预授权，免费套餐不扣费），即使蓝图里没有任何数据库。没有国际卡时请用上面的 Docker 方式自行部署。
-
-免费实例的其他限制：15 分钟无访问会休眠，首次访问需等待约 30 秒；默认使用容器内 SQLite，**重新部署会清空数据**，需要持久化就把 Neon / Supabase 等免费 PostgreSQL 的连接串填进 `DATABASE_URL`。生产环境务必设置 `ALLOW_PRIVATE_TARGET=false`。
+- **数据库**：默认使用容器内 SQLite，容器重建会清空数据；需要持久化就把 PostgreSQL 的连接串填进 `DATABASE_URL`（Neon、Supabase 等提供免费额度）；
+- **安全**：务必设置 `ALLOW_PRIVATE_TARGET=false`，让执行引擎拦截内网目标。
 
 ## 配置
 

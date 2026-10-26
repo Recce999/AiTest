@@ -23,5 +23,5 @@ COPY --from=frontend /build/dist frontend/dist
 WORKDIR /app/backend
 EXPOSE 8000
 
-# Render 会注入 PORT，本地运行时回退到 8000
+# 容器平台会注入 PORT，本地运行时回退到 8000
 CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]

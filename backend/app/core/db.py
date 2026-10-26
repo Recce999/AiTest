@@ -8,7 +8,7 @@ from sqlalchemy.orm import DeclarativeBase, sessionmaker
 from app.core.config import settings
 
 database_url = settings.database_url
-# 部分云平台（如 Render/Heroku）下发 postgres:// 前缀，SQLAlchemy 需要 postgresql://
+# 部分云平台下发 postgres:// 前缀，SQLAlchemy 需要 postgresql://
 if database_url.startswith("postgres://"):
     database_url = database_url.replace("postgres://", "postgresql://", 1)
 
