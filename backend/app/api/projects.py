@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from app.core.db import get_db
 from app.core.deps import get_current_user
 from app.core.response import success
-from app.models.models import Project, User
+from app.models.models import Project, Run, RunResult, User
 from app.schemas.schemas import ProjectIn, ProjectOut
 from app.services.access import get_project
 
@@ -47,6 +47,11 @@ def update_project(
 @router.delete("/{project_id}", summary="删除项目")
 def delete_project(project_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     project = get_project(db, user, project_id)
+    # 接口和用例靠 ORM 关系级联删除；执行记录与执行结果没配关系，必须显式清理，否则留下孤儿数据
+    run_ids = [row[0] for row in db.query(Run.id).filter(Run.project_id == project.id)]
+    if run_ids:
+        db.query(RunResult).filter(RunResult.run_id.in_(run_ids)).delete(synchronize_session=False)
+        db.query(Run).filter(Run.id.in_(run_ids)).delete(synchronize_session=False)
     db.delete(project)
     db.commit()
     return success(None, "删除成功")
