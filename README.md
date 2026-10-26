@@ -1,16 +1,38 @@
 # AITest · 轻量接口自动化测试平台
 
+[![CI](https://github.com/Recce999/AiTest/actions/workflows/ci.yml/badge.svg)](https://github.com/Recce999/AiTest/actions/workflows/ci.yml)
+
 录入接口定义 → AI 生成测试用例 → 一键执行 → 可视化报告。
+
+## 界面预览
+
+| 登录 | 项目管理 |
+| --- | --- |
+| ![登录](assets/screenshots/01-login.png) | ![项目管理](assets/screenshots/02-projects.png) |
+
+| 接口管理 | 执行报告 |
+| --- | --- |
+| ![接口管理](assets/screenshots/03-apis.png) | ![执行报告](assets/screenshots/05-runs.png) |
+
+| 报告详情 | 用例与断言 |
+| --- | --- |
+| ![报告详情](assets/screenshots/04-run-detail.png) | ![用例与断言](assets/screenshots/06-cases.png) |
+
+界面风格：深色侧边栏 + 靛蓝紫主色（`#6366F1`）；统一卡片、状态色与空状态，通过率环形进度、方法分段筛选、断言 chip、响应体抽屉等细节均按「单页单主操作」原则组织。
+
+## 在线演示
+
+部署地址：待补充（Render 免费实例，15 分钟无访问会休眠，首次打开约需 30 秒唤醒）。
 
 ## 技术栈
 
 | 层 | 选型 | 理由 |
 | --- | --- | --- |
 | 后端 | FastAPI + SQLAlchemy 2 + Pydantic v2 | 轻量、自带 OpenAPI 文档、代码量小 |
-| 数据库 | SQLite（开发）→ MySQL（部署） | 零配置起步，上线只改一行 |
+| 数据库 | SQLite（开发）→ PostgreSQL（部署） | 零配置起步，上线只改连接串 |
 | 认证 | JWT + bcrypt | 无状态、部署简单 |
 | 前端 | Vue3 + Vite + Element Plus + Pinia | 当前主流组合，组件齐全 |
-| 部署 | Docker Compose + Nginx | 一条命令起服务 |
+| 部署 | Docker 单镜像 + Render | 前后端同源，一条命令起服务 |
 
 ## 功能
 
@@ -27,17 +49,22 @@
 aitest/
 ├── backend/
 │   ├── app/
-│   │   ├── main.py              # 入口：路由装配、CORS、异常、日志、建表
+│   │   ├── main.py              # 入口：路由装配、CORS、异常、日志、建表、托管前端
 │   │   ├── api/                 # 路由层（只做参数校验与转发）
 │   │   ├── core/                # 配置、数据库、安全、异常、日志
 │   │   ├── models/              # 六张表
 │   │   ├── schemas/             # 请求/响应校验
 │   │   └── services/            # 业务层（认证、执行引擎、AI 生成、权限）
+│   ├── tests/                   # pytest 用例（23 个）
 │   ├── requirements.txt
+│   ├── requirements-dev.txt
 │   └── .env.example
 ├── frontend/                    # Vue3 + Vite + Element Plus
-├── docs/                        # 设计说明书、手册、练习单
-└── docker-compose.yml 等部署文件见 docs 第 9 章
+├── assets/screenshots/          # README 界面截图
+├── .github/workflows/ci.yml     # 后端测试 + 前端构建
+├── Dockerfile                   # 多阶段构建：Node 构建前端 → Python 运行后端
+├── render.yaml                  # Render 一键部署配置
+└── docs/                        # 设计说明书、手册、练习单（本地资料，未入库）
 ```
 
 ## 本地启动
@@ -58,11 +85,63 @@ uvicorn app.main:app --reload
 
 ```bash
 cd frontend
-pnpm install
-pnpm dev
+npm install
+npm run dev
 ```
 
 打开 <http://localhost:5173>，注册后登录。
+
+> 生产构建 `npm run build` 产出 `frontend/dist`，后端启动时会自动托管该目录，前后端同源。
+
+## 测试与 CI
+
+```bash
+cd backend
+pip install -r requirements-dev.txt
+python -m pytest
+```
+
+- 23 个用例覆盖：健康检查、认证与越权、项目/接口/用例 CRUD、AI 生成建议不落库、执行引擎（假响应替换真实 HTTP）、SSRF 拦截、执行历史与报告详情。
+- 测试使用临时 SQLite，每个用例执行前重建表，互不污染。
+- GitHub Actions 同时执行后端 pytest 与前端 `npm run build`。
+
+## 部署
+
+### Render（推荐，免费）
+
+仓库已包含 `render.yaml`：
+
+1. 推送代码到 GitHub；
+2. 打开 <https://render.com/deploy?repo=https://github.com/Recce999/AiTest>，连接仓库；
+3. Render 自动读取 `render.yaml`，创建 Docker 服务并注入 `JWT_SECRET`；
+4. 部署完成后访问 `https://<服务名>.onrender.com/health` 验证。
+
+免费实例的注意点：
+
+- 15 分钟无访问会休眠，首次访问需等待唤醒；
+- 容器内 SQLite 在重新部署后会重置；需要长期保存数据时，在 Render 挂载磁盘，或把 `DATABASE_URL` 指向 PostgreSQL。
+- 生产环境已通过 `render.yaml` 设置 `ALLOW_PRIVATE_TARGET=false`，执行引擎会拦截内网目标。
+
+### Docker
+
+```bash
+docker build -t aitest .
+docker run -p 8000:8000 -e JWT_SECRET="$(python -c 'import secrets;print(secrets.token_hex(32))')" aitest
+```
+
+访问 <http://127.0.0.1:8000>，前端、接口、文档由同一个容器提供。
+
+## 配置
+
+所有配置项见 [`backend/.env.example`](backend/.env.example)，复制为 `backend/.env` 后修改即可：
+
+| 配置项 | 默认值 | 说明 |
+| --- | --- | --- |
+| `DATABASE_URL` | `sqlite:///./aitest.db` | 数据库连接串，支持 PostgreSQL |
+| `JWT_SECRET` | `change-me-in-production` | 生产必改，至少 32 字节随机串 |
+| `ALLOW_PRIVATE_TARGET` | `True` | 生产必须为 `False`，拦截内网目标 |
+| `REQUEST_TIMEOUT` | `5` | 单次请求超时（秒） |
+| `LLM_API_KEY` | 空 | 留空则 AI 生成走规则模板 |
 
 ## 接口一览
 
