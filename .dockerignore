@@ -1,0 +1,23 @@
+.git
+.gitignore
+.github
+docs
+.tools
+
+# Python
+backend/.venv
+backend/tests
+backend/.pytest_cache
+backend/logs
+backend/*.db
+**/__pycache__
+**/*.pyc
+
+# Node
+frontend/node_modules
+frontend/dist
+
+# 其他
+*.log
+.DS_Store
+Thumbs.db

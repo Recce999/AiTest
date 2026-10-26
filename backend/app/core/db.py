@@ -7,10 +7,15 @@ from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 from app.core.config import settings
 
-# check_same_thread=False 是 SQLite 在 FastAPI 多线程下的必需参数
-connect_args = {"check_same_thread": False} if settings.database_url.startswith("sqlite") else {}
+database_url = settings.database_url
+# 部分云平台（如 Render/Heroku）下发 postgres:// 前缀，SQLAlchemy 需要 postgresql://
+if database_url.startswith("postgres://"):
+    database_url = database_url.replace("postgres://", "postgresql://", 1)
 
-engine = create_engine(settings.database_url, connect_args=connect_args, echo=False)
+# check_same_thread=False 是 SQLite 在 FastAPI 多线程下的必需参数
+connect_args = {"check_same_thread": False} if database_url.startswith("sqlite") else {}
+
+engine = create_engine(database_url, connect_args=connect_args, echo=False)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
 

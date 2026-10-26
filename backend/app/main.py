@@ -4,10 +4,13 @@
 文档：http://127.0.0.1:8000/docs
 """
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from loguru import logger
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.api import apis, auth, cases, health, projects, runs
 from app.core.config import settings
@@ -46,3 +49,24 @@ register_exception_handlers(app)
 app.include_router(health.router)
 for module in (auth, projects, apis, cases, runs):
     app.include_router(module.router, prefix="/api")
+
+
+# ---------- 前端静态文件（生产镜像里由同一个容器托管） ----------
+FRONTEND_DIST = Path(__file__).resolve().parents[2] / "frontend" / "dist"
+
+
+class SPAStaticFiles(StaticFiles):
+    """找不到静态文件时回退到 index.html，交给 vue-router 处理前端路由。"""
+
+    async def get_response(self, path: str, scope):
+        try:
+            return await super().get_response(path, scope)
+        except StarletteHTTPException as exc:
+            if exc.status_code == 404:
+                return await super().get_response("index.html", scope)
+            raise
+
+
+# 本地开发只跑后端时 dist 不存在，跳过挂载；Docker 构建后自动生效
+if FRONTEND_DIST.is_dir():
+    app.mount("/", SPAStaticFiles(directory=FRONTEND_DIST, html=True), name="frontend")

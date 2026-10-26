@@ -1,0 +1,19 @@
+# Render Blueprint：连接 GitHub 后一键创建免费 Web 服务
+services:
+  - type: web
+    name: aitest
+    runtime: docker
+    plan: free
+    region: singapore
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: DEBUG
+        value: "false"
+      - key: ALLOW_PRIVATE_TARGET
+        value: "false"
+      - key: JWT_SECRET
+        generateValue: true
+      - key: REQUEST_TIMEOUT
+        value: "5"
