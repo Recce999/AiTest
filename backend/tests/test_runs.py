@@ -209,3 +209,49 @@ def test_disabled_case_is_skipped(client, make_user, monkeypatch):
 
     assert run["total"] == 1
     assert run["results"][0]["case_id"] == enabled_case["id"]
+
+
+def test_run_only_selected_cases(client, make_user, monkeypatch):
+    _, headers = make_user()
+    project_id, api_id, first_case = _setup(client, headers)
+    client.post(
+        "/api/cases",
+        json={
+            "api_id": api_id,
+            "name": "第二条用例",
+            "payload": {},
+            "assertions": [{"type": "status_code", "expected": 200}],
+            "enabled": True,
+        },
+        headers=headers,
+    )
+    monkeypatch.setattr(
+        "app.services.executor.requests.request", _fake_request(200, {"data": {"status": "up"}})
+    )
+
+    run = client.post(
+        "/api/runs",
+        json={"project_id": project_id, "case_ids": [first_case["id"]]},
+        headers=headers,
+    ).json()["data"]
+
+    assert run["total"] == 1
+    assert run["results"][0]["case_id"] == first_case["id"]
+
+
+def test_run_rejects_case_from_other_project(client, make_user, monkeypatch):
+    _, headers = make_user()
+    project_id, _, _ = _setup(client, headers)
+    _, _, other_case = _setup(client, headers)
+    monkeypatch.setattr(
+        "app.services.executor.requests.request", _fake_request(200, {"data": {"status": "up"}})
+    )
+
+    body = client.post(
+        "/api/runs",
+        json={"project_id": project_id, "case_ids": [other_case["id"]]},
+        headers=headers,
+    ).json()
+
+    assert body["code"] == 1
+    assert body["msg"] == "没有可执行的用例"

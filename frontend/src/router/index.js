@@ -4,7 +4,7 @@ const routes = [
   { path: '/login', component: () => import('../views/Login.vue') },
   { path: '/', component: () => import('../views/Projects.vue') },
   { path: '/projects/:pid/apis', component: () => import('../views/Apis.vue') },
-  { path: '/apis/:aid/cases', component: () => import('../views/Cases.vue') },
+  { path: '/projects/:pid/apis/:aid/cases', component: () => import('../views/Cases.vue') },
   { path: '/projects/:pid/runs', component: () => import('../views/Runs.vue') },
   { path: '/runs/:id', component: () => import('../views/RunDetail.vue') }
 ]

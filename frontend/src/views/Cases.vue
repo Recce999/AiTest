@@ -8,10 +8,19 @@
         </button>
         <h1 class="page-title">用例管理</h1>
         <p class="page-sub">
-          接口 <span class="mono">#{{ aid }}</span> · AI 生成的建议需确认后才会写入用例库
+          接口 <span class="mono">#{{ aid }}</span> · 选中用例可直接执行，AI 生成的建议需确认后才会写入用例库
         </p>
       </div>
       <div class="page-actions">
+        <el-button
+          v-if="selected.length"
+          type="primary"
+          :icon="VideoPlay"
+          :loading="running"
+          @click="onRunSelected"
+        >
+          执行所选 {{ selected.length }} 条
+        </el-button>
         <el-button class="ai-btn" :icon="MagicStick" :loading="aiLoading" @click="onAiGenerate">
           AI 生成用例
         </el-button>
@@ -20,7 +29,8 @@
     </div>
 
     <div class="section-card list-card">
-      <el-table :data="list" v-loading="loading" class="case-table">
+      <el-table :data="list" v-loading="loading" class="case-table" @selection-change="onSelectionChange">
+        <el-table-column type="selection" width="46" />
         <el-table-column label="用例名" min-width="210">
           <template #default="{ row }">
             <span class="case-name">{{ row.name }}</span>
@@ -133,21 +143,29 @@
 
 <script setup>
 import { onMounted, reactive, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { ArrowLeft, Document, MagicStick, Plus } from '@element-plus/icons-vue'
+import { ArrowLeft, Document, MagicStick, Plus, VideoPlay } from '@element-plus/icons-vue'
 import request from '../api/request'
 
 const route = useRoute()
+const router = useRouter()
+const pid = Number(route.params.pid)
 const aid = Number(route.params.aid)
 
 const list = ref([])
 const loading = ref(false)
 const aiLoading = ref(false)
+const running = ref(false)
+const selected = ref([])
 const dialog = ref(false)
 const aiDialog = ref(false)
 const candidates = ref([])
 const form = reactive({ name: '', payloadText: '', assertionsText: '' })
+
+function onSelectionChange(rows) {
+  selected.value = rows
+}
 
 function assertionChips(assertions) {
   if (!Array.isArray(assertions) || !assertions.length) return []
@@ -222,6 +240,20 @@ async function adopt(row) {
 async function adoptAll() {
   for (const row of candidates.value) await adopt(row)
   aiDialog.value = false
+}
+
+async function onRunSelected() {
+  running.value = true
+  try {
+    const data = await request.post('/runs', {
+      project_id: pid,
+      case_ids: selected.value.map((row) => row.id)
+    })
+    ElMessage.success(`执行完成：总 ${data.total}，通过 ${data.passed}，失败 ${data.failed}`)
+    router.push(`/runs/${data.id}`)
+  } finally {
+    running.value = false
+  }
 }
 
 async function onDelete(row) {

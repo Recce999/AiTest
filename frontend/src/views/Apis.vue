@@ -65,7 +65,7 @@
         </el-table-column>
         <el-table-column label="操作" width="160" align="right">
           <template #default="{ row }">
-            <el-button size="small" type="primary" link @click="$router.push(`/apis/${row.id}/cases`)">用例</el-button>
+            <el-button size="small" type="primary" link @click="$router.push(`/projects/${pid}/apis/${row.id}/cases`)">用例</el-button>
             <el-button size="small" type="danger" link @click="onDelete(row)">删除</el-button>
           </template>
         </el-table-column>
