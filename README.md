@@ -109,17 +109,18 @@ python -m pytest
 
 ### Render（推荐，免费）
 
-仓库已包含 `render.yaml`：
+仓库已包含 `render.yaml`，会用 Docker 构建单一镜像，并自动创建免费 PostgreSQL：
 
 1. 推送代码到 GitHub；
 2. 打开 <https://render.com/deploy?repo=https://github.com/Recce999/AiTest>，连接仓库；
-3. Render 自动读取 `render.yaml`，创建 Docker 服务并注入 `JWT_SECRET`；
+3. Render 自动读取 `render.yaml`，创建 Web 服务 + 数据库，并注入 `JWT_SECRET` 与 `DATABASE_URL`；
 4. 部署完成后访问 `https://<服务名>.onrender.com/health` 验证。
 
 免费实例的注意点：
 
-- 15 分钟无访问会休眠，首次访问需等待唤醒；
-- 容器内 SQLite 在重新部署后会重置；需要长期保存数据时，在 Render 挂载磁盘，或把 `DATABASE_URL` 指向 PostgreSQL。
+- 15 分钟无访问会休眠，首次访问需等待唤醒（约 30 秒）；
+- 免费 PostgreSQL 也有限制（容量 256MB、到期需升级），数据随实例保留；
+- 未配置 `DATABASE_URL` 时会退回容器内 SQLite，重新部署即清空；
 - 生产环境已通过 `render.yaml` 设置 `ALLOW_PRIVATE_TARGET=false`，执行引擎会拦截内网目标。
 
 ### Docker

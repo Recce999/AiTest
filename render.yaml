@@ -1,4 +1,4 @@
-# Render Blueprint：连接 GitHub 后一键创建免费 Web 服务
+# Render Blueprint：连接 GitHub 后一键创建「免费 Web 服务 + 免费 PostgreSQL」
 services:
   - type: web
     name: aitest
@@ -17,3 +17,15 @@ services:
         generateValue: true
       - key: REQUEST_TIMEOUT
         value: "5"
+      # 数据库连接串由 Render 注入，容器重启/重新部署不会丢数据
+      - key: DATABASE_URL
+        fromDatabase:
+          name: aitest-db
+          property: connectionString
+
+databases:
+  - name: aitest-db
+    plan: free
+    region: singapore
+    databaseName: aitest
+    user: aitest
